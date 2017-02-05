@@ -10,20 +10,20 @@ Juha Komulainen, Evident Solutions Oy
 :last-update-label: Päivitetty
 :figure-caption!:
 
-include::00-johdanto.adoc[]
+include::_00-johdanto.adoc[]
 
-include::01-redundanssia.adoc[]
+include::_01-redundanssia.adoc[]
 
-include::02-database-final.adoc[]
+include::_02-database-final.adoc[]
 
-include::03-riippuvuudet.adoc[]
+include::_03-riippuvuudet.adoc[]
 
-include::04-luokkakysymyksia.adoc[]
+include::_04-luokkakysymyksia.adoc[]
 
-include::05-tyhmia-testeja.adoc[]
+include::_05-tyhmia-testeja.adoc[]
 
-include::06-paketit-ja-kerrokset.adoc[]
+include::_06-paketit-ja-kerrokset.adoc[]
 
-include::07-initialisaatiota.adoc[]
+include::_07-initialisaatiota.adoc[]
 
-include::08-liiketoiminta-vs-view-logiikka.adoc[]
+include::_08-liiketoiminta-vs-view-logiikka.adoc[]

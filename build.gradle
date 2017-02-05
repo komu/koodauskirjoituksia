@@ -1,6 +1,7 @@
 plugins {
     id 'base'
     id 'org.asciidoctor.convert' version '1.5.3'
+    id "org.hidetake.ssh" version "2.7.2"
 }
 
 dependencies {
@@ -9,10 +10,45 @@ dependencies {
 
 asciidoctor {
     sourceDir = file('src')
-    sources {
-        include 'komun-koodauskirjoituksia.adoc'
-    }
     backends = ['html5', 'pdf']
 }
 
 assemble.dependsOn asciidoctor
+
+remotes {
+    uuhi {
+        host = 'uuhi.evident.fi'
+        user = 'evident'
+        knownHosts = file('etc/known_hosts')
+        agent = true
+    }
+}
+
+task deploy {
+    dependsOn build
+
+    doLast {
+        def timestamp = new Date().format("yyyy-MM-dd'T'HH-mm-ss")
+        def wwwDir = "/var/www/komun-koodauskirjoituksia"
+        def target = "$wwwDir/$timestamp"
+        ssh.run {
+            session(remotes.uuhi) {
+                // copy our new bits into a fresh directory
+                execute "mkdir $target"
+                put from: "$projectDir/build/asciidoc/html5/**", into: target
+                put from: "$projectDir/build/asciidoc/pdf/**", into: target
+
+                // store the old current version into symlink 'old'
+                execute "ln -s \$(readlink $wwwDir/current) $wwwDir/old"
+
+                // point the 'current' symlink to new version. this is an atomic
+                // operation that replaces the old symlink with new one
+                execute "ln -sfT $target $wwwDir/current"
+
+                // remove directory pointed by 'old' and 'old'-symlink itself
+                execute "rm -rf \$(readlink $wwwDir/old)"
+                execute "rm $wwwDir/old"
+            }
+        }
+    }
+}
