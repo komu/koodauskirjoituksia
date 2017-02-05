@@ -1,0 +1,238 @@
+== Riippuvuudet vs riippuvuudet
+
+=== Taustaa
+
+==== Tapaus 1
+
+Tuossa aiemmin käytiin keskustelua koodista, jossa komponentti loi dialogin. Dialogi tarvitsi dataa palvelulta,
+jota erinäisistä syistä ei voinut suoraan injektoida, joten koodi antoi komponentille viitteen palvelumetodiin
+jota se tarvisi. Eli osapuilleen näin:
+
+[source,javascript]
+----
+dialog.edit(id, {
+    getReferenceData: myService.findFoo.bind(myService)
+});
+----
+
+Minä valitin siitä, että tässä on turhaa epäsuoruutta: olisi selkeämpää antaa viite suoraan palveluun:
+
+[source,javascript]
+----
+dialog.edit(id, myService);
+----
+
+Asiallisena vasta-argumenttina esitettiin ajatus siitä, että halutaan minimoida dialogin rajapinta ulospäin ja antaa
+sille vain se tietä mitä se tarvitsee.
+
+==== Tapaus 2
+
+Toisessa tapauksessa oli sitten erilaista koodia, jossa pyydettiin palvelulta JPA-objekti ja esitettiin sille kysymys:
+
+[source,java]
+----
+boolean userIsFrobnicator = userProvider.getUser().isFrobnicator();
+----
+
+Tästä koodista valitin, että on kurjaa pyytää kokonainen `User`, kun pelkkä `boolean` riittäisi. Eli vaihtoehtoina
+voisi olla vaikka:
+
+[source,java]
+----
+boolean userIsFrobnicator = userProvider.isUserFrobnicator();
+boolean userIsFrobnicator = userProvider.hasRole(FROBNICATOR);
+----
+
+tai mahdollisesti jopa:
+
+[source,java]
+----
+boolean userIsFrobnicator = userProvider.getUser().isFrobnicator();
+----
+
+(Tämän erotus alkuperäiseen olisi se, että takaisin tulisi `CurrentUser`, joka ei olisi JPA-objekti vaan jonka
+rajapinta olisi minimoitu nimenomaan `UserProvider`:in käyttötapausten pohjalta.)
+
+Tätä muutosta pidettiin ihan perusteltuna, mutta ristiriitaisena edellisen ohjeen kanssa: miksi yhdessä tapauksessa
+pitäisi minimoida rajapinta ja toisessa ei? Tämä postaus pyrkii vastaamaan kysymykseen ja samalla hieman jäsentelemään
+omaa intuitiotani asian tiimoilta.
+
+Tässä vaiheessa on hyvä harjoitus pysähtyä viideksi minuutiksi, pohtia ongelmaa ja kirjata ajatuksia ylös. Ihan oikeasti.
+
+...
+
+Nyt jatketaan ja katsotaan mitä ajatuksia minulle tuli mieleen.
+
+=== Luokkia ja luokkia
+
+Javassa luokka on abstraktion perusyksikkö, jolla mallinnetaan monia erilaisia ongelmia. Tälle asialle tulee helposti
+sokeaksi niin että ajattelee samojen sääntöjen koskevan kaikkia luokkia. Joissakin toisissa ohjelmointikielissä on
+natiivisti ominaisuuksia joita Javassa emuloidaan luokilla. Tästä on sekä hyötyä että haittaa: toisaalta yhtenäistäminen
+selkeyttää asioita ja mahdollistaa samojen mekanismien moniin kysymyksiin, toisaalta taas pakottaa toimimaan vähän
+geneerisemmän mallin suhteen.
+
+Käytännön koodauksessa on kuitenkin tärkeää hahmottaa erityyppisten luokkien erilaiset ominaisuudet, elinkaaret,
+instanssien löydettävyys, jne. Eli on hyödyllistä ajatella käsittein kuten _service_, _DTO_, _value_, _entity_, _id_,
+_factory_, _controller_ jne. Asiat jotka pitävät paikkansa servicelle eivät välttämättä pidä paikkaansa entityille
+jne. Vaikka `String` ja `EmployeeService` ovat molemmat luokkia, on selvää, että niillä on aika vähän muuta yhteistä.
+
+=== Palvelut
+
+Tyypillinen palvelu (tai controller tms.) on tilaton tai sen tila on globaalia (vähintäänkin jossain hallitussa
+kontekstissa) ja siitä on hyvin rajallinen määrä instansseja (tyypillisesti yksi). Yleensä palvelun rajapinta toimii
+jo itsessään tunnisteena palvelulle. Riittää että sanon haluavani `EmployeeDao`:n, en tarvitse nimenomaisesti
+`EmployeeDao(id=123)`-objektia.
+
+Palvelujen metodit ovat toteuttavat yleensä jonkun järkevän liiketoiminnallisen kokonaisuuden ja huolehtivat että ne
+säilyttävät järjestelmän invariantit.
+
+=== Entity
+
+Entityistä on monia instansseja ja on keskeistä mihin minulla on viite. Sen kautta voi päästä käsiksi suureen
+objektigraafiin muita objekteja joilla voi olla erilaisia rajoitteita elinkaaren tai invarianttien suhteen. Voi olla
+että osa objektigraafista initialisoidaan laiskasti. Ehkä osa sisältää dataa jota käyttäjä ei saisi nähdä.
+
+Entityt voivat tarjota useita matalan tason metodeita joiden kutsuminen mielivaltaiseista paikoista voi aiheuttaa
+ongelmia.
+
+=== Tavallinen objekti
+
+"`Tavallinen objekti`" sisältyy useasti tiukemmin johonkin tiettyyn käyttötapaukseen kuin entity, mutta siitä on
+aivan samalla tavalla useita viitteitä ja niiden identiteetillä on merkitystä. Usein se on vähemmän vaarallinen
+kuin entity, koska se on suunniteltu tietty käyttötapaus mielessäpitäen.
+
+=== Mielenkiintoiset kysymykset
+
+Mitkä asiat arkkitehtuurissa ovat tärkeitä? Millaisiin kysymyksiin halutaan koodin antavan vastauksia? Tämä eroaa
+selvästi riippuen siitä minkälainen luokka on kyseessä.
+
+Koska palvelut ovat käytännössä enemmän tai vähemmän tilattomia, niihin liittyvät kysymykset ovat pitkälti staattista
+analyysiä koodin pohjalta:
+
+  * Ketkä kaikki käyttävät palvelua?
+  * Kuinka paljon metodiin X on kutsuja ympäri järjestelmää? Paljon tuhoa aiheutuu jos muuten sen rajapintaa?
+
+Muiden objektien seuraaminenkin onkin paljon vaikeampaa kuin palveluiden riippuvuussuhteiden analysointi, koska vaikka
+itse luokat ovat staattisesti tiedossa, ne eivät välttämättä kerro vielä paljoa. Datan kanssa täytyy olla paljon
+huolellisempi siitä mitä välittää minnekin. Hallitsemattomat muutokset dataan voivat korruptoida järjestelmän.
+Pelkästään datan lukeminen voi aiheuttaa performanssiongelmia. Koska entityt ovat suurin ongelma, on niiden välttäminen
+rajapinnoissa usein iso askel eteenpäin. Määritellään sen sijaan objekteja, jotka kertovat juuri sen mitä halutaan.
+
+Turhan datan palauttamisen aiheuttama redundanssi on vaikeampaa löytää. Jos palvelumetodia ei kutsuta tai sitä kutsutaan
+harvoista paikoista, se on helppo havaita. Mutta jos palautetaan luokan Foo instanssi ja vain osaa sen metodeista
+kutsutaan tässä tapauksessa, mutta muualla niihin tehdään kyllä kutsuja, ei ole mitään helppoa tapaa havaita sitä että
+tässä tapauksessa data on redundanttia. Redundantti data rajapinnoissa taas johtaa helposti siihen, että palvelut
+joutuvat tekemään liikaa työtä hakiessaan dataa jota ei edes tarvita. Samalla koodi monimutkaistuu.
+
+=== Takaisin alkuperäisiin esimerkkeihin
+
+Muistellaan ekaa esimerkkiä:
+
+[source,javascript]
+----
+dialog.edit(id, {
+    getReferenceData: myService.findFoo.bind(myService)
+});
+----
+
+Selvästi dialogi on oikeasti riippuvainen `myService.findFoo`-metodista, mutta riippuvuus on vain piilotettu. Navigointi
+komponenttien välillä on vaikeampaa ja vastaukset kysymyksiin _Kuka käyttää `findFoo`-metodia?_, _Kuinka monta kutsua 
+`findFoo`-metodiin on?_ ovat vääriä.
+
+Lisäksi ulkopuolinen komponentti on saanut oudon riippuvuuden dialogin sisäiseen toteutukseen. Jos dialogi tarvitseekin
+jotain muuta dataa, pitää dialogin avaavaa komponenttia päivittää. Miksi ihmeessä toisten komponenttien vahtiminen
+kuuluisi alkuperäisen komponentin vastuualueeseen?
+
+Ja mikäli luokille ei saisi välittää palveluita joissa on ylimääräisiä metodeja, niin pitäisikö jokaisesta palvelusta
+customoida jokaiselle clientille oma rajapinta jonka palvelu toteuttaisi?
+
+Toisaalta toinen esimerkki:
+
+[source,java]
+----
+boolean userIsFrobnicator = userProvider.getUser().isFrobnicator();
+----
+
+Tässä on selvästi ongelma, koska vaaditaan palvelua säilyttämään ja palauttamaan JPA-objekti, jonka suhteesta
+persistenttiin tilaan ei ole selkeää tietoa (mitenkä muutokset objektiin vaikuttavat tietokantaan, mitä dataa saan
+objektista lukea). Samalla sidotaan palvelun toteutustekniikka.
+
+=== Koodin testaus ja auditointi
+
+Koska palvelut tarjoavat käyttötapauksia, mutta entityt koko rajoittamattoman mallin, palveluita on turvallisempaa
+jakaa eri kutsujille. Hyvin suunnitellut palvelukutsut on mahdollista auditoida ja testata niin että voidaan varmistua
+siitä, kaikilla kutsuilla on järkevä semantiikka.
+
+`userProvider.getUser()`-matopurkeille tämä ei ole mahdollista: jos käyttäjä pääsee domain-malliin käsiksi, on
+käytännössä rikottu jo kaikki abstraktiorajat palvelun ja sen kutsujan väliltä. On mahdotonta lukea palvelun koodia
+lokaalisti ja tulla siihen tulokseen että se toimii oikein.
+
+=== Riippuvuus sivuvaikutuksettomuuteen
+
+Otetaan vielä esiin alkuperäinen koodi:
+
+[source,javascript]
+----
+dialog.edit(id, {
+    getReferenceData: myService.findFoo.bind(myService)
+});
+----
+
+Yksi argumentti tämän puolesta voisi olla se, että nyt kutsuja voi luottaa kohtuullisella varmuudella että komponentti
+ei tee mitään muita sivuvaikutuksia kuin annetun. Tämä toki pitää paikkansa, mutta on huomattava että kytkentä
+"A luottaa ettei B tee sivuvaikutuksia" on vahvempi kuin "A toimii vaikka B tekisi ihan mitä tahansa".
+
+Tässä tapauksessa olisi siis parasta koodata kutsuva komponentti niin että dialog.edit saa vaikka tarvittaessa lähettää
+raketin kuuhun ja kutsuja on valmis toimimaan riippumatta mihin tilaan maailma sen jälkeen jää.
+
+=== Bonus: moduleista
+
+Palvelut ovat muuten hyvä esimerkki asioista, jotka eivät olisi monessa muussa kielessä luokkia.
+
+Jos toteuttaisin `EmployeeService`:n C:llä, niin luultavasti tekisin sen metodeista vain globaaleja funktioita. En
+voisi tehdä testejä varten erilaisia instansseja, mutta C tarjoaisi muita mekanismeja: saattaisin vaihtaa palvelulle
+testi-dependencyt preprocessor-makroilla tai linkkerillä. Tai sitten tekisin jotain globaaleja flageja.
+
+Toinen lähestymistapa on ML-kielien modulisysteemi funktoreineen. (ML-funktoreita ei pidä sekoittaa Haskellin, C++:n
+tai Prologin funktoreihin – kaikissa neljässä kielessä on oma merkityksensä.) ML:n modulisysteemi on periaatteessa
+ylimääräinen rajoitettu ohjelmointikieli varsinaisen kielen päällä: käännösyksiköillä voi olla signatureja (tyyppejä),
+joilla voi olla eri toteutuksia. Tässä kielessä modulit ovat arvoja ja funktorit ovat sitten funktioita joiden
+parametreja ja paluuarvoja ovat modulit. Kieli tarjoaa siis tavallaan suoraan tuen sille että voi tehdä
+IOC-tyyppisiä juttuja käännösaikaisesti:
+
+[source,sml]
+----
+signature EMPLOYEE_DAO = sig
+  val findEmployeeById : employeeId -> employee
+  val saveEmployee : employee -> unit
+end
+
+signature EMPLOYEE_SERVICE = sig
+  val doubleSalary : employeeId -> unit
+end
+----
+
+Nämä signaturet eivät siis määrittele rajapintoja Java-tyyliin, vaan spesifioivat koko modulin tyypin. Modulit
+itsessään eivät ole varsinaisessa kielessä first-class objekteja sen enempää kuin Javan importtaamat nimetkään,
+mutta moduli-kielessä niitä voi käsitellä funktorein:
+
+[source,sml]
+----
+functor EmployeeService (DAO: EMPLOYEE_DAO): EMPLOYEE_SERVICE = struct
+   ...
+end
+----
+
+Koodi siis sanoo, että "jos annat minulle `EMPLOYEE_DAO`:n toteuttavan modulin, niin osaan antaa `EMPLOYEE_SERVICE`:n.
+Itse modulin luonti on puhtaasti käännösaikainen ja efektiivisesti sama kuin jos olisin itse copy-pastennut koodin ja
+korvannut DAO-viitteen kaikkialla oikealla toteutuksella. Lopulta itse "`IOC-konfiguraatio`" on jotain tällaista:
+
+[source,sml]
+----
+structure MyEmployeeService = EmployeeService(SqlEmployeeDao)
+----
+
+Java ei tietenkään tällaisia tarjoa, vaan Javan ratkaisu on tarjota luokkia ja niiden instansseja. (Scala yritti joskus
+tarjota kompromissia, jossa tehtäisiin eksplisiittisen ML-tyyppistä arkkitehtuuria, jossa functorit olisivat traitteja
+jotka jättävät tyyppejä abstrakteiksi ja structuret olisivat globaaleja object-määrittelyitä. En ole havainnut tämän
+lähetysmistavan ottaneen kovasti tuulta alleen.)

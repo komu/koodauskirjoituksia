@@ -1,0 +1,115 @@
+== Redundanssia
+
+Pohdin tuossa itsekseni heuristiikkaa/metriikkaa jota en ole nähnyt missään, mutta joka
+itselläni on ollut alitajuisena niin pitkään kuin muistan.
+
+=== Don't be be a bad square
+
+Kaikki ovat varmaan sitä mieltä, että alla oleva `goodSquare` on hyvä ja `badSquare` on huono.
+
+[source,kotlin]
+----
+fun goodSquare(x: Int) = x * x
+
+fun badSquare(x: Int, extra: String) = x * x
+----
+
+Tämä nyt on aika äärimmäinen esimerkki, eikä kukaan kirjoittaisi jälkimmäistä funktiota: kutsuja
+joutuu keksimään jostain ylimääräisen `String`-parametrin, jota ei käytetä mihinkään.
+
+=== Neliöpalkkaus
+
+No, mitenkäs seuraava?
+
+[source,kotlin]
+----
+class Employee(val name: String,
+               val salary: Int,
+               val birthday: LocalDate)
+
+fun squareOfSalary(emp: Employee) = square(emp.salary)
+----
+
+Funktio näyttää yksinkertaiselta, eikä siinä ole ylimääräisiä parametreja. Vai onko? Itse
+asiassahan sinne annetaan parametrina kokonainen `Employee`, joten sillä on kaksi ylimääräistä
+parametrina: `name` ja `birthday`. Tämä ei ole ihan ongelmatonta:
+
+1. Jos en saa jostain kokonaista `Employee`-objektia käsiini vaan pelkästään palkan (esim. jonkun
+   tietokantaprojektion tulos), en voi kutsua tuota metodia. Tämä rajoittaa konteksteja joissa
+   tuota voi käyttää sekä tapoja joilla tuota kutsuvia luokkia voi refaktoroida.
+2. En voi kutsujana olla varma siitä mitä kaikkea `squareOfSalary` tarvitsee annetulta
+   Employee:lta ilman että luen sen koodia (etenkin JPA:n tapauksessa voi pitää paikkansa,
+   että olemme transaktion ulkopuolella ja kaikkiin `Employee`:n kenttiin ei voi koskea ilman
+   että ne heittävät poikkeuksen.)
+3. En voi kutsujana olla varma siitä muuttaako `squareOfSalary` annettua `Employee`:ta ilman että
+   luen sen koodia.
+
+Kohdat 2 ja 3 ovat erityisen ongelmallisia sen takia, että molemmat vaativat implisiittisen
+sopimuksen muodostamista koodin nykytilan perusteella, mutta myöhemmin koodia lukiessa ei ole
+mitenkään ilmeistä millaisia sopimuksia on solmittu. Koodi jäätyy ja sitä ei enää uskalla muuttaa,
+koska ei voi olla varma kaikkien kutsujien/kutsuttavien tekemistä oletuksista koodille.
+
+=== Yllättävä oheiskustannus
+
+Oletetaanpa, että `squareOfSalary` olisikin määritelty kuten alla. Onkos tässä mitään ongelmia
+edellisen lisäksi?
+
+[source,kotlin]
+----
+fun squareOfSalary(emp: Employee) = emp.salary * emp.salary
+----
+
+Toki yksi asia on se, että nyt yleiskäyttöisen neliöintialgoritmin toteutus on tullut toteutettua
+domainista riippuvaan paikkaan eikä sitä voi käyttää tai testata muualla. Mutta toki realistisesti
+neliöinti on niin triviaali operaatio, ettei siitä tarvitse välittää. Jos operaatio olisi joku
+monimutkaisempi, niin tämä olisi toki hyvä huomio.
+
+Toinen huomio on se, että tämä on tiukemmin kytketty `Employee`-luokkaan. Sen lisäksi, että
+funktio olettaa että on olemassa `salary` jota voi kutsua, se tekee oletuksen siitä että propertyn
+getterin toteutus on halpa.  Tämä voi olla paikoin ihan hyväksyttävä oletus koodissa, mutta on
+joka tapauksessa hyvä tiedostaa se. Tämän nimenomaisen metodin tapauksessa on turha tehdä vahvempaa
+kytkentää kuin tarpeellista ja onkin parempi getteriä vain kerran:
+
+[source,kotlin]
+----
+fun squareOfSalary(emp: Employee): Int {
+   val salary = emp.salary
+   return salary * salary
+}
+----
+
+Ylläoleva on muuten mainio ero koodin pinnallisen monimutkaisuuden ja todellisen monimutkaisuuden
+erosta. Ylempi esimerkki näyttää pinnallisesti yksinkertaisemmalta, mutta todellisuudessa sen
+toimintaa on vaikeampi seurata ja se on myös hitaampi kuin alempi. Alempi on vähemmän söpö, mutta
+silti yksinkertaisempi. Toki se alkuperäinen `squareOfSalary` joka kutsuu erillistä `square`-funktiota
+on sekä kaunis että yksinkertainen (kuten tämän kirjoittaja).
+
+=== Esimerkeistä metriikaksi
+
+Ehdotankin seuraavaa metriikkaa:
+
+> Funktion parametrien redundanssi on parametrien sisältämien ylimääräisten tietojen määrän
+> suhde objektigaafin kaikkeen dataan. Paluuarvon redundanssi on vastaava luku paluuarvolle.
+
+`goodSquare`-funktion tapauksessa sekä parametrien että paluuarvon redundanssi on 0; vaikuttaa
+myös epätodennäköiseltä että redundanssi kasvaisi refaktoroinnin myötä.
+
+Tällä hetkellä `squareOfSalary`:n parametrien redundanssi on tällä hetkellä yli 2/3 (objektin
+propertyt laskettuna tarkasti 2/3, mutta lisäksi metodiin välitetään `Employee`-objektin
+identiteetti). Tässä tapauksessa vaikuttaa todennäköiseltä, että redundanssi tulee projektin
+myötä kasvamaan paljonkin.
+
+En ehdota, että kukaan rupeaisi laskemaan näitä konkreettisesti (tai edes ehdottamaan konkreettista
+laskutapaa joka huomioisi mutabilityt, referenssit, gettereiden potentiaalisen overridauksen),
+mutta on väitän että tämä on hyvä ajattelun väline: on hyvä pohtia näitä kysymyksiä ja yleensä
+pyrkiä minimoimaan rajapintojen redundanttius.
+
+=== Vastaesimerkki
+
+Toki joskus halutaan tiettyä redundanssia: monesti on mielekästä, että `Foo` antaa `Bar`:ille
+ylimääräistä dataa välittämättä siitä tarvitseeko Bar sitä kaikkea.  Tämä voi olla ihan perusteltua.
+On kuitenkin hyvä pitää mielessä, että tämä tekee Foo:n ylläpitämisestä vaikeampaa: kun `Foo` on
+kerran antanut `Quux`:n `Bar`:lle, on potentiaalisesti rikkova muutos jos ei enää myöhemmin annakaan.
+Ehkä myöhemmin muutosten myötä `Foo` olisi paljon yksinkertaisempi toteuttaa jos sen ei tarvitsisi
+hakea `Quux`-objektia, mutta nyt se ei ole mahdollista ilman että tutkitaan perusteellisesti myös
+`Bar`:n toteutus.

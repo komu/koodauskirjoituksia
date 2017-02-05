@@ -1,0 +1,86 @@
+== Miksi Database on final?
+
+Sain sähköpostilla seuraavan kysymyksen liittyen http://dalesbred.org[Dalesbredin]
+`Database`-luokkaan:
+
+> Kysymys Database-luokasta. Onko jotain erityistä syytä miksi se on final class?
+> Olisi tarpeen lisätä siihen muutama attribuutti periyttämällä siitä oma luokka.
+> Voin tietysti muuttaa lähdekoodia tai ympäröidä Databasen omalla wrapper-luokalla,
+> mutta kumpikin on ratkaisuna vähän kiertotie.
+
+Alla vastaukseni kysyjälle, ajattelin että voisi kiinnostaa muitakin.
+
+On useampiakin syitä miksi toi on `final`, mutta tärkein on se etten maalaa itseäni nurkkaan
+tuon evoluution kanssa. Jos se ei olisi final ja sovellukset perisivät siitä, niin metodin
+lisäys luokkaan olisi potentiaalisesti rikkova muutos. Hyvässä tapauksessa signature
+aiheuttaisi itsessään konfliktin ja tulisi käännösvirhe (joka olisi toki sekin ikävää),
+huonossa tapauksessa toi voisi edelleen kääntyä, mutta aiheuttaa muutoksia olemassaolevan
+koodin semantiikkaan.
+
+Kuvitellaan että sovelluksessa olisi määritelty seuraava aliluokka:
+
+[source,java]
+----
+public class MyDatabase extends Database {
+
+    public int foo(Object o) {
+        return o.hashCode();
+    }
+}
+
+...
+
+int x = db.foo("foo");
+----
+
+Myöhemmin Dalesbred lisäisikin oman `foo`-metodin:
+
+[source,java]
+----
+public class Database {
+    …
+
+    public int foo(String s) {
+        return s.length();
+    }
+}
+----
+
+Hups, vanha koodi kääntyy edelleen uudella versiolla, mutta toimiikin yhtäkkiä eri tavalla. Ei hyvä.
+Tämä ei nyt toki ollut erityisen realistinen esimerkki, mutta on helppoa keksiä ihan uskottavia
+esimerkkejä joissa sekä minä että joku Dalesbredin käyttäjä saa päähänsä nimetä jonkun metodin
+samalla tavalla. Kun pidän luokan finalina, mulla on vähemmän rajoitteita sen suhteen mitä voin
+tehdä koodille hajoittamatta käyttäjiä.
+
+Toki on muitakin syitä.
+
+Ensinnäkin pyrin aina tekemään kaikesta finalia, jollen ole eksplisiittisesti miettinyt,
+suunnitellut ja dokumentoinut eri laajennuspisteitä ja niiden semantiikkaa. Silloin kun
+luokka ei ole final, teen finaleita kaikista niistä metodeista joita ei ole selvästi
+tarkoitettu overridettäväksi. Tämä tekee ohjelmista vähänkään laajemmassa mittakaavassa
+ymmärrettävämpiä, koska koodia voi tulkita ilman että tarvitsee jokaisen metodikutsun
+kohdalle ajatella vaihtoehtoa “tässä voi tapahtua mielivaltaisia sivuvaikutuksia”.
+Huomattavasti helpompaa pitää invarianteistaan huolta.
+
+Lokaalisti olisi toki monesti söpömpää pystyä modaamaan olemassaolevia objekteja, mutta
+usein tällaiset suunnittelemattomat ad hoc -laajennokset aiheuttavat vain ongelmia.
+Fragile base class problem on jo muinaisina aikoina tunnistettu ongelma ja final on
+ratkaisu siihen. Monien muiden lähteiden lisäksi ainakin https://www.amazon.com/Effective-Java-2nd-Joshua-Bloch/dp/0321356683[Effective Java] käsittelee näitä ongelmia.
+
+Sitten on ihan kysymys koheesiosta ja hyvästä suunnittelusta. Jos aliluokka määrittelee
+jotain uutta tilaa tai metodeja, jotka eivät vaikuta mitenkään yliluokan operaatioihin,
+niin miksi perintä olisi edes perusteltua? Kompositio on melkein aina perintää joustavampi
+ja selkeämpi ratkaisu jo senkin tähden että se tekee riippuvuussuhteiden suunnasta
+eksplisiittisen. Perintä on hyödyllistä lähinnä silloin kun aliluokan on järkevää
+overridetä jotain operaatioita. Mutta niissä tilanteissa pyrin yleensä extractoimaan
+kyseisen asian omaksi strategiakseen (esim. Dalesbredin `TransactionManager`, `Dialect`
+ja tyyppikonversiot). Olen huomannut, että omat luokkani ovat lähes sataprosenttisesti
+joko finaleita tai abstracteja.
+
+Kaiken tämän sanottuani, ymmärrän että on kivempi että koodissa lukee `db.myOperation(x, y)`
+kuin `myOperation(db, x, y)`. Sen takia pidän Kotlinin ja C#:n extension metodeista kovasti,
+koska saa kaikki hyvät puolet: IDE:n autocomplete ehdottaa db. omiakin metodeja, koodi näyttää
+sujuvammalta, mutta asiat ovat kuitenkin selkeästi kapseloituja ilman mitään fragile base
+class -ongelmia. Kotlinissa noi vielä pääsevät näkemään määrittelypisteensä scopenkin.
+Mutta suurimman osan projekteista koodaan kuitenkin Javalla ja silloin suosin vahvasti
+käsitteellistä selkeyttä syntaktisen söpöyden ohi.

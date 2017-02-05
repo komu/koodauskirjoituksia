@@ -1,0 +1,57 @@
+== Liiketoimintalogiikkaa vs view-logiikkaa
+
+Tuli tuossa katseltua yhtä näkymää, jossa oli mahdollisuus siirtyä edit-tilaan, jossa tiettyjä kenttiä sai editoida.
+Eli karkeasti jotain tällaista:
+
+[source,html]
+----
+<editor if="editMode" property="foo" />
+----
+
+Twisti oli siinä, että riippuen mallin tilasta halutaan sallia vain tiettyjen kenttien editointi:
+
+[source,html]
+----
+<editor if="editMode && isStartOfTracking && !isRestViolation" property="foo" />
+----
+
+Kun näitä rupeaa tulemaan paljon, niin äkkiä templatessa onkin aika paljon logiikkaa. Järjestelmää on vaikea ymmärtää
+ja testata. Ehdot duplikoituvat helposti. Mikä ratkaisuksi?
+
+Siirretään logiikka pois templatesta:
+
+[source,javascript]
+----
+mayEditFoo() {
+    return this.editMode && this.isStartOfTracking  && !this.isRestViolation;
+}
+----
+
+[source,html]
+----
+<editor if="mayEditFoo()" property="foo" />
+----
+
+Äkkiseltään tämä vaikuttaisi hyvältä, mutta loppujen lopuksi koodin abstraktitaso ei noussut juurikaan vaan aiheutimme
+vain indirektiota, joka tekee koodista ehkä vain vaikeamman ymmärtää. Hyvänä puolena on se, että tuolle voisi
+halutessaan kirjoittaa testejä helpommin, mutta siihen se jääkin.
+
+Mikä tuossa on vikana? Uusi koodi sotkee keskenään liiketoimintalogiikkaa (missä domainin tilassa mitäkin kenttiä saa
+muokata) ja käyttöliittymän toteutuksen logiikkaa (meillä sattuu inline-editoinnin mahdollistava `editMode` sen sijaan
+että olisi esim. erillinen dialogi). Puolet koodista on sellaista, että koodaajan pitää varmistaa asiakkaalta onko se
+oikein ja toinen puoli on sellaista, että asiakas ei voi siihen edes ottaa kantaa. Eli yritetään uudestaan:
+
+[source,javascript]
+----
+mayEditFoo() {
+    return this.isStartOfTracking  && !this.isRestViolation;
+}
+----
+
+[source,html]
+----
+<editor if="editMode && mayEditFoo()" property="foo" />
+----
+
+Nyt `mayEditFoo` sisältää vain liiketoimintalogiikkaa ja sen voisi käydä vaikka asiakkaan kanssa yhdessä läpi
+halutessaan. Sillä on selkeä tehtävä: se abstrahoi tietyn liiketoimintasäännön.

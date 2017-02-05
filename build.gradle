@@ -1,0 +1,18 @@
+plugins {
+    id 'base'
+    id 'org.asciidoctor.convert' version '1.5.3'
+}
+
+dependencies {
+    asciidoctor 'org.asciidoctor:asciidoctorj-pdf:1.5.0-alpha.11'
+}
+
+asciidoctor {
+    sourceDir = file('src')
+    sources {
+        include 'komun-koodauskirjoituksia.adoc'
+    }
+    backends = ['html5', 'pdf']
+}
+
+assemble.dependsOn asciidoctor

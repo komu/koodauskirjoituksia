@@ -1,0 +1,14 @@
+== Johdanto
+
+Tässä dokumentissa on joukko ohjelmointiaiheisia kirjoituksia, joita olen kirjoittanut alunperin Evidentin sisäiseen
+levitykseen. Koska näissä ei varsinaisesti ole mitään salaista ja ne voivat kiinnostaa muitakin, päätin jakaa ne
+yleisemminkin.
+
+Olen alunperin kirjoittanut tekstit hyvin rajatulle kohderyhmälle tarkoituksena herättää keskustelua. Nytkään en ole
+muotoilua lukuunottamatta muokannut niitä. Osa teksteistä tekee aika huolettomia hyppyjä olettaen, että lukijat
+jakavat osapuilleen samoja näkemyksiä ohjelmoinnista. Perusteluita ja selityksiä on siis huomattavasti vähemmän kuin
+jos olisin alunperin kirjoittanut isommalle yleisölle.
+
+Yksittäiset luvut ovat itsenäisiä ja ne voi lukea missä tahansa järjestyksessä.
+
+Palautetta voi antaa osoitteeseen juha.komulainen@evident.fi.

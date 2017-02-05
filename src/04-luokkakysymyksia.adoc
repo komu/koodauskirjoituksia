@@ -1,0 +1,145 @@
+== Luokkakysymyksiä
+
+Melkoisen usein koodatessa tulee vastaan tämäntyyppisiä signatureja:
+
+[source,java]
+----
+void foo(Map<Integer, Set<EmployeeAvailability>> availabilitiesById) {
+    ...
+}
+----
+
+Usein tuohon sitten liittyy N+1 staattista apumetodia, jotka ovat parametrina noita vastaavia:
+
+[source,java]
+----
+static Set<EmployeeAvailability> getAvailabilities(
+        Map<Integer, Set<EmployeeAvailability>>, int EmployeeId) {
+
+    Set<EmployeeAvailability> result = availabilities.get(EmployeeId);
+    if (result != null)
+        return result;
+    else
+        throw new IllegalArgumentException(...);
+}
+
+static Set<Period> availablePeriods(
+        Map<Integer, Set<EmployeeAvailability>>, int EmployeeId) {
+
+    return getAvailabilities(availabilities, EmployeeId)
+        .stream()
+        .filter(EmployeeAvailability::isAvailable)
+        .map(EmployeeAvailability::getPeriod)
+        .collect(toSet());
+}
+----
+
+On tietysti aika ikävää, että signaturet ovat monimutkaisia eivätkä kerro hirveän tarkkaan semantiikkaa. Jos vaikka
+sitten haluaisikin metodissa dokumentoida tarkkaan mitä `Map<Integer, Set<EmployeeAvailability>>` tarkoittaa, niin
+pitäisikö se dokumentoida jokaisessa metodissa?
+
+TypeScriptissä, Kotlinissa, C:ssä ja monessa muussakin kielessä voisi tietysti tuon signaturen duplikaation poistaa
+tyyppialiaksella ja dokumentoidakin sen samalla:
+
+[source,kotlin]
+----
+/**
+ * Mapping from ids of employees to their availability information.
+ */
+type EmployeeAvailabilities = Map<Integer, Set<EmployeeAvailability>>
+----
+
+Tämäkään ei kuitenkaan poista sitä ongelmaa, että noita staattisia helpperimetodeita valuu serviceihin mahdollisesti
+vaikeasti testattaviin paikkoihin ja koodista tulee muutenkin vaikeammin seurattavaa.
+
+Ratkaisu on tietysti ilmeinen. Mulla on hyvin matala kynnys tehdä uusia luokkia tuollaisissa tilanteissa:
+
+[source,java]
+----
+final class EmployeeAvailabilities {
+
+    private final Map<Integer, Set<EmployeeAvailability>> availabilities = new HashMap<>();
+
+    ...
+
+    public Set<Period> availablePeriods(int EmployeeId) {
+        return getAvailabilities(EmployeeId)
+            .stream()
+            .filter(EmployeeAvailability::isAvailable)
+            .map(EmployeeAvailability::getPeriod)
+            .collect(toSet());
+    }
+
+    private Set<EmployeeAvailability> getAvailabilities(int EmployeeId) {
+        Set<EmployeeAvailability> result = availabilities.get(EmployeeId);
+        if (result != null)
+            return result;
+        else
+            throw new IllegalArgumentException(...);
+    }
+}
+----
+
+Kotlinissa ja C#:ssa voisi toki harkita myös extension-metodeja tuolle alkuperäiselle tyypille, mutta luokilla on se
+hyvä puoli, että ne kokoavat kaikki tietylle tietorakenteelle semanttisesti merkitykselliset operaatiot yhteen paikkaan
+ja piilottavat kaikki muut.
+
+=== Koska tehdä luokkia?
+
+Sekalainen joukko ei-kattavia heuristiikkoja:
+
+1. Tiedon esitysmuoto on yksinkertainen (esim. `String`), mutta siihen liittyy useampia erilaisia operaatioita jotka ovat
+    mielekkäitä vain sille. (Esim. kyseessä olikin polku jolta haluaisimme kysyä polun komponentteja.)
+2. Tiedon esitysmuoto on yksinkertainen, mutta se leviää laajalle alueelle softassa. Tällöin on useampikin hyvä syytä
+   kapseloida luokkaan:
+    a. Staattinen tyypitys: jos `Email` ja `Path` ovat omia tyyppejään, niin niiden sotkeminen keskenään on epätodennäköisempää
+    b. Löydettävyys: on helpompi etsiä koodista `Email`-viitteitä kuin selvittää mitkä `String`-viitteistä ovat emaileja.
+    c. Kapselointi, jotta muutokset ovat helpompia: jos esitysmuoto myöhemmin muutetaan (ehkä `Path` olisikin parempi esittää listana komponentteja), niin on helpompaa jos sille on ADT.
+3. Tiedon esitysmuoto on kompleksinen. Alkuperäisen esimerkin `Map<Integer, Set<EmployeeAvailability>>` on monimutkainen,
+   joten kannattaa harkita luokan tekemistä vaikka kohdat 1 ja 2 eivät välttämättä toteutuisikaan.
+
+=== Vielä yksinkertaisempi esimerkki
+
+Tämä varmaan menee kategoriaan, jossa suurin osa ei lähtisi tekemään omaa luokkaa, enkä minäkään aina, mutta tämä
+tuntuisi silti perustellulta:
+
+[source,java]
+----
+final class EmployeeSecondments {
+
+    private final @NotNull Map<Integer, List<Secondment>> secondmentsByEmployeeId;
+
+    EmployeeSecondments(@NotNull Collection<Secondment> secondments) {
+        this.secondmentsByEmployeeId = secondments.stream()
+            .collect(groupingBy(s -> s.EmployeeId, toList()));
+    }
+
+    public @NotNull Collection<Secondment> secondmentsForEmployee(int EmployeeId) {
+        return secondmentsByEmployeeId.getOrDefault(EmployeeId, emptyList());
+    }
+}
+----
+
+Nyt mun DAO ei palautakaan Map-tulosta, vaan tuollaisen:
+
+[source,java]
+----
+return new EmployeeSecondments(db.findAll(Secondment.class, query.build()));
+----
+
+DAO:n rajapinta on mukavampi lukea, sitä käyttävä koodi on mukavampaa. Kun noita välitetään eri paikkoihin, on heti
+signaturesta selvää mitä informaatiota välitetään.
+
+=== Kohti yksinkertaisempaa
+
+Ja lopuksi melkeinpä tärkein: koska tuon objektin julkinen rajapinta on paljon pienempi kuin `Map`:n (tuossahan on vain
+yksi metodi), niin tämä tekee refaktoroinnin mahdolliseksi. Jos myöhemmin tulee vaikka tarve ensin lisätä
+`boolean hasSecondmentsOn(LocalDate)` ja sitten vielä myöhemmin huomataan että `secondmentsForEmployee`-metodia ei enää
+kutsutakaan, on helppo havaita että sisäistä tietorakennetta voidaan yksinkertaistaa, koska tarvitsemme vähemmän dataa
+vastataksemme tukemiimme kysymyksiin. Tästä taas seuraa se, että voimme huomata että DAO-kyselystäkin voi tulla
+yksinkertaisempi.
+
+Jos välittäisimme alunperin DAO:sta takaisin vain `Map`:n, sitoutuisimme huomattavasti laajempaan rajapintaan ja olisi
+paljon vaikeampaa huomata koodista, että itse asiassa `Map`:n käyttöpatternit ovat sellaisia että vähemmälläkin datalla
+pärjäisi.
+

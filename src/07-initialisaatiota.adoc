@@ -1,0 +1,338 @@
+== Initiaatio initialisaatioon
+
+Etenkin testidataa luotaessa on varmaan joskus tullut vastaan jotain tällaista:
+
+[source,java]
+----
+List<Department> createDepartments() {
+    Employee e1 = new Employee();
+    e1.id = 1;
+    e1.name = "Emp 1";
+
+    Employee e2 = new Employee();
+    e2.id = 2;
+    e2.name = "Emp 2";
+
+    Employee e3 = new Employee();
+    e3.id = 3;
+    e3.name = "Emp 3";
+
+    Employee e4 = new Employee();
+    e4.id = 4;
+    e4.name = "Emp 4";
+
+    Department d1 = new Department();
+    d1.name = "Dept 1";
+    d1.employees = asList(e1, e2);
+
+    Department d2 = new Department();
+    d2.name = "Dept 2";
+    d2.employees = asList(e3, e4);
+
+    Department d3 = new Department();
+    d3.name = "Dept 3";
+    d3.employees = emptyList();
+
+    return asList(d1, d2, d3);
+}
+----
+
+Yksittäisiä rivejä on tietysti helppo ymmärtää, mutta kokonaisuus jää vähän hämärän peittoon. Lisäksi kun tekee lisää
+dataa, niin tuo suorastaan kerjää sitä että copy-pasteaa pätkän koodia ja unohtaa muuttaa yhden jonkun `d3`-viitteen
+`d4`:ksi tms.
+
+=== Vaihtoehto: constructorit
+
+Tässä nimenomaisessa esimerkissä oikea vaihtoehto olisi tietysti tehdä sopiva constructori:
+
+[source,java]
+----
+List<Department> createDepartments() {
+    return asList(
+        new Department("Dept 1", asList(
+            new Employee(1, "Emp 1"),
+            new Employee(2, "Emp 2"))),
+        new Department("Dept 2", asList(
+            new Employee(3, "Emp 3"),
+            new Employee(4, "Emp 4"))),
+        new Department("Dept3", emptyList()));
+}
+----
+
+Nyt on jo rakenteen perusteella selvää mikä työntekijä kuuluu mihinkin osastoon ja uusienkin tietojen lisääminen on
+turvallisempaa. Lisäksi objekteista voidaan mahdollisesti tehdä immutableja. Eli kaikin puolin hyvä ratkaisu.
+
+Toisaalta tilanteissa joissa on paljon eri propertyjä joista mahdollisesti alustetaan eri objekteille eri joukkoja
+constructor ei välttämättä aina ole selkein ratkaisu vaan haluaisi nähdä nimiä. Eli mietitään vaihtoehtoja tilanteisiin,
+joihin constructorit (tai vastaavat staattiset helpperi-funktiot) eivät kuitenkaan sovellu.
+
+=== Vaihtoehto: fluent-setterit
+
+[source,java]
+----
+List<Department> createDepartments() {
+    return asList(
+        new Department()
+            .withName("Dept 1")
+            .add(new Employee().withId(1).withName("Emp 1"),
+            .add(new Employee().withId(2).withName("Emp 2"),
+        new Department()
+            .withName("Dept 2")
+            .add(new Employee().withId(3).withName("Emp 3"),
+            .add(new Employee().withId(4).withName("Emp 4"),
+        new Department()
+            .withName("Dept 3"));
+}
+----
+
+Tämäkin voi joissain tilanteissa olla ihan hyvä ratkaisu, mutta toisaalta äkkiä se johtaa siihen, että ollaan
+kirjoittamassa paljon koodia joka ei liity mitenkään itse ongelman ratkaisuun vaan siihen miltä koodi näyttää
+syntaktisesti.
+
+Lisäksi noissa on se ongelma, että koodista ei ole ihan selvää mitä se tekee:
+
+[source,java]
+----
+Employee e1 = new Employee().withId(4);
+Employee e2 = e1.withName("Foo");
+Employee e3 = e1.withName("Bar");
+----
+
+Onko API funktionaalinen, jolloin kaikki kolme muuttujaa viittaavat eri objekteihin vai viittaavatko ne kaikki samaan
+objektiin? Koska metodit palauttavat jonkun arvon, niin se antaisi ymmärtää, että arvolla on joku merkitys, mutta
+tietysti tyypillisessä fluent-API:ssa paluuarvo on aina `this`.
+
+Javassa on jo ihan hyvä tapa tehdä monta metodikutsua samalle objektille:
+
+[source,java]
+----
+e.setId(4);
+e.setName("Foo");
+----
+
+Nyt lukijalle ei jää mitään epäselvyyttä siitä mitä tuossa tapahtuu. Vastoin yleistä harhakäsitystä toi puolipiste
+ei ole mitenkään erityisen kallis operaatio jota tulisi kaikin keinoin välttää.
+
+=== Vaihtoehto: double brace initialization
+
+Mutta emmekö palanneet juuri takaisin alkupisteeseen jos kaikki täytyy nimetä? Olisiko vaihtoehtoja? Kuulen jo huudon
+double brace initializationista:
+
+[source,java]
+----
+List<Department> createDepartments() {
+    return asList(
+        new Department() {{
+            name = "Dept 1";
+            employees = asList(
+                new Employee() {{
+                    id = 1;
+                    name = "Emp 1";
+                }},
+                new Employee() {{
+                    id = 2;
+                    name = "Emp 2";
+                }});
+        }},
+        new Department() {{
+            name = "Dept 1";
+            employees = asList(
+                new Employee() {{
+                    id = 3;
+                    name = "Emp 3";
+                }},
+                new Employee() {{
+                    id = 4;
+                    name = "Emp 4";
+                }});
+        }},
+        new Department() {{
+            name = "Dept 3";
+            employees = emptyList();
+        }});
+}
+----
+
+On söpö ja hauska hack kun siihen törmää ensimmäisen kerran. Ja samalla koodia, jota ei pidä koskaan päästää
+lähellekään tuotantoa.
+
+Kannattaa hetki pohtia mitä kaikkea tästä vois seurata.
+
+Meinasin kirjoittaa tästä pitemmänkin rantin, mutta näköjään joku muu olikin jo käsitellyt tärkeimmät ongelmat:
+https://blog.jooq.org/2014/12/08/dont-be-clever-the-double-curly-braces-anti-pattern/
+
+=== Vaihtoehto geneerinen init-metodi
+
+Mitenkä voitaisiin yhdistää puurakenne ja eksplisiittinen asetusten settaaminen ilman double brace initin ongelmia?
+Tekemällä geneerinen metodi, joka mahdollistaa annetun objektin initialisoinnin ja sitten palauttaa sen:
+
+[source,java]
+----
+static <T> T init(T value, Consumer<T> initializer) {
+    initializer.accept(value);
+    return value;
+}
+----
+
+Nyt voimme sanoa:
+
+[source,java]
+----
+Employee emp = init(new Employee(), e -> {
+    e.id = 1;
+    e.name = "Emp 1";
+});
+----
+
+Ja itse asiassa voimme vielä siirtää objektin luomisenkin metodin vastuulle:
+
+[source,java]
+----
+static <T> T create(Supplier<T> factory, Consumer<T> initializer) {
+    return init(factory.get(), initializer);
+}
+----
+
+Jolloinka voimme sanoa ehkä vielä astetta kuvaavammin:
+
+[source,java]
+----
+Employee emp = create(Employee::new, e -> {
+    e.id = 1;
+    e.name = "Emp 1";
+});
+----
+
+Nyt takaisin alkuperäiseen esimerkkiin:
+
+[source,java]
+----
+List<Department> createDepartments() {
+    return asList(
+        create(Department::new, d -> {
+            d.name = "Dept 1";
+            d.employees = asList(
+                create(Employee::new, e -> {
+                    e.id = 1;
+                    e.name = "Employee 1";
+                }),
+                create(Employee::new, e -> {
+                    e.id = 2;
+                    e.name = "Employee 2";
+                }));
+        }),
+        create(Department::new, d -> {
+            d.name = "Dept 2";
+            d.employees = asList(
+                create(Employee::new, e -> {
+                    e.id = 3;
+                    e.name = "Employee 3";
+                }),
+                create(Employee::new, e -> {
+                    e.id = 4;
+                    e.name = "Employee 4";
+                }));
+        }),
+        create(Department::new, d -> {
+            d.name = "Dept 3";
+            d.employees = emptyList();
+        }));
+}
+----
+
+Tässä on hiukan syntaktista overheadia, mutta edelleen puun rakenne on eksplisiittinen ja double brace initin ongelmia
+ei ole.
+
+=== Vaihtoehto: Kotlin
+
+Ihan rehellisesti mun ei ollut tarkoitus kirjoittaa Kotlinista tähän mitään kun aloitin, mutta pakkohan mun nyt on.
+Kotlinissa on kaikilla objekteilla oletuksena extension method `apply`, joka ottaa blockin koodia, ajaa sen objektin
+kontekstissa (eli this viittaa objektiin jolle `apply`-kutsu tehdään) ja lopuksi palauttaa objektin. Kotlin-versio
+voisi siis olla tällainen ilman mitään itse määriteltyjä apufunktioita:
+
+[source,kotlin]
+----
+fun createDepartments(): List<Department> = listOf(
+    Department().apply {
+        name = "Dept 1"
+        employees = listOf(
+            Employee().apply {
+                id = 1
+                name = "Emp 1"
+            },
+            Employee().apply {
+                id = 2
+                name = "Emp 2"
+            })
+    },
+    Department().apply {
+        name = "Dept 2"
+        employees = listOf(
+            Employee().apply {
+                id = 3
+                name = "Emp 3"
+            },
+            Employee().apply {
+                id = 4
+                name = "Emp 4"
+            })
+    },
+    Department().apply {
+        name = "Dept 3"
+        employees = emptyList()
+    })
+----
+
+Kaiken lisäksi `apply` on vielä inline-metodi, joten kaikilla näillä lambdoilla ei ole mitään runtime-overheadia, vaan
+tämä on yhtä tehokas kuin ihan ensimmäinen koodiesimerkki, joka sisälsi joukon muuttujia.
+
+Toisaalta, Kotlin tukee default-parametreja ja nimettyjä parametreja, joten koodin voisi kirjoittaa myös näin
+(lisäsin nyt vielä esimerkin vuoksi uusia propertyjä joita ei välttämättä initialisoida kaikissa kutsuissa):
+
+[source,kotlin]
+----
+class Employee(
+    val id: Int,
+    val name: String,
+    val salary: Int = 0)
+
+class Department(
+    val name: String,
+    val managers: List<Employee> = emptyList(),
+    val employees: List<Employee> = emptyList())
+
+fun createDepartments(): List<Department> = listOf(
+    Department(
+        name = "Dept 1",
+        employees = listOf(
+            Employee(id = 1, name = "Emp 1"),
+            Employee(id = 2, name = "Emp 2", salary = 42))),
+    Department(
+        name = "Dept 2",
+        employees = listOf(
+            Employee(id = 1, name = "Emp 3"),
+            Employee(id = 2, name = "Emp 4"))),
+    Department(name = "Dept 3"))
+----
+
+Nyt on saavutettu kaikki:
+
+  * Rakenne on selkeästi esillä koodissa
+  * Parametrit nimet voi kirjoittaa koodiin
+  * Osa parametreista voidaan tehdä pakollisiksi, osa optionaalisiksi
+  * Objektit initialisoidaan suoraan oikeaan tilaan ja voidaan samalla tarvittaessa validoida
+  * Objektit voivat olla immutableja
+
+Ja toki kaikkia parametreja ei ole pakko nimetä, ehkä sanoisin oikeasti:
+
+[source,kotlin]
+----
+fun createDepartments(): List<Department> = listOf(
+    Department("Dept 1", employees = listOf(
+        Employee(1, "Emp 1"),
+        Employee(2, "Emp 2", salary = 42))),
+    Department("Dept 2", employees = listOf(
+        Employee(3, "Emp 3"),
+        Employee(4, "Emp 4"))),
+    Department("Dept 3"))
+----

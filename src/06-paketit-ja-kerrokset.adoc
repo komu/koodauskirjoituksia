@@ -1,0 +1,145 @@
+== Paketit ja kerrokset
+
+Pakettisuunnittelu on periaatteessa suoraviivaista. Common-reuse principle kertoo että samaan pakettiin pitäisi laittaa
+luokkia joita käytetään yhdessä. Pakettien pitäisi koota yhteen tietyn käyttötapauksen luokkia eikä esimerkiksi koota
+luokkia tyypeittäin. Miksi se on kuitenkin niin vaikeaa?
+
+=== Pellet iskevät taas
+
+Kaikki ovat varmasti nauraneet nähneet ja nauraneet tällaisille hierarkioille:
+
+----
+constants
+   FooConstants
+dto
+   EditFooDto
+   FrobnicateFooDto
+   BarDto
+   FooListingDto
+exceptions
+   FooNotWhizzledException
+   FrobnicationException
+   BarException
+services.interfaces
+   FooService
+   BarService
+services.impl
+   FooServiceImpl
+   BarServiceImpl
+----
+
+Käyttäessäni `FooService`:ä importoin sitten luokkia viidestä eri paketista ja vastaavasti tehdessäni muutoksia
+foo-toiminnallisuuteen, muokkaan viittä eri pakettia. Pakettirakenne ei varsinaisesti kerro mitään tämän sovelluksen
+rakenteesta vaan kuvaa yleistä arkkitehtuuria joka voisi olla yhteinen miljoonalle eri järjestelmälle. Toisin sanoen
+rakenne ei auta meitä ymmärtämään miten tämä sovellus eroaa niistä kaikista muista järjestelmistä.
+
+=== Suunnittelua palveluiden kautta
+
+Meille kaikille on varmaan selvää, että parempi olisi yrittää mallintaa asioita palveluiden kautta. Pohtia millainen
+on palvelurajapinta, millaisia tietotyyppejä ja poikkeuksia siihen liittyy ja pistää ne kaikki samaan pakettiin yhdeksi
+kokonaisuudeksi:
+
+----
+services.foo
+    FooService
+    FooServiceImpl
+    FooConstants
+    EditFooDto
+    FrobnicateFooDto
+    FooListingDto
+    FooNotWhizzledException
+    FrobnicationException
+services.bar
+    BarDto
+    BarException
+    BarService
+    BarServiceImpl
+----
+
+Paljon parempi! Nyt järjestelmään tutustuva ihminen näkee heti mitä luokkia foo-toimintoihin liittyy. Ja ehkä
+`FooConstants` olikin luokka jota tarvitaan vain paketin sisällä ja siitä voidaan tehdä package protected,
+näin pienentäen paketin julkista rajapintaa.
+
+Näinhän me olemme aina tehneet softaa, me osaamme tämän jutun!
+
+=== DAO:jen kosto
+
+Nyt kun olemme suunnitelleet palvelumme hienosti ja määritelleet paketin joka tarjoaa järkevän kokonaisuuden palvelun
+kutsujalle, onkin aika toteuttaa se ja lisäämme mukaan DAO:t.
+
+----
+dao
+    FooDao
+dao.hibernate
+    HibernateFooDao
+----
+
+Ok, suoraviivaista. Paitsi että olisi tosi mukava jos DAO-kysely voisi palauttaa suoraan `FooListingDto`-objekteja.
+Mutta `FooListingDto` elää `services.foo`-paketissa ja olisi Suurta Pahuutta tehdä DAO-tasolta riippuvuus
+service-tasolle. Niinpiä siirrämme DTO:n omaan pakettiinsa josta sekä DAO:t ja servicet voivat olla riippuvaisia.
+
+----
+dao
+    FooDao
+dao.hibernate
+    HibernateFooDao
+dto
+    FooListingDto
+services.foo
+    FooService
+    FooServiceImpl
+    FooConstants
+    EditFooDto
+    FrobnicateFooDto
+    FooNotWhizzledException
+    FrobnicationException
+----
+
+Mahtavaa, ongelma korjattu! Vielä kun tehdään sama siirto muillekin luokille sitä mukaa kun ruvetaan toteuttamaan
+DAO-luokkia, niin ollaankin taas lähtöpisteessä. Arkkitehtuurissa täytyy olla jotain vikaa, jos muutokset palveluiden
+toteutukseen aiheuttavat massiivisia muutoksia palvelurajapintaan.
+
+=== Liian vähän luokkia
+
+Hei, eikös ratkaisu ongelmiin ollut lisätä luokkia? Ongelma on tietysti siinä, että DAO:n pitäisi palauttaa
+DAO-paketissa määritelty `FooListingDaoDto`, jonka service sitten muuttaa omassa paketissaan määrittelemäksi
+`FooListingDto`:ksi. Layerit eivät vuoda läpi ja kaikki on kaunista. Tällä on mukava työllistävä vaikutus, koska
+päästään kirjoittamaan jumalattomasti boilerplate-koodia, jossa kopioidaan identtisiä luokkia. Voidaan vaikka tehdä
+uusia serviceitä vastaamaan tästä kopioinnista, jotta itse liiketoimintalogiikka ei peity sen alle.
+
+Tai sitten voidaan kyseenalaistaa ongelma.
+
+=== Paketit != kerrokset
+
+Palataan takaisin Suunnittelua palveluiden kautta -kohdan ratkaisuun, mutta tehdäänkin harhaoppinen ratkaisu ja tehdään
+DAO-tasolta riippuvuus service-tasolla määriteltyihin DAO-luokkiin. Vaikka pakettien välillä onkin syklinen riippuvuus,
+niin itse luokkien välillä tällaista ei kuitenkaan ole. Tämä ei ole lainkaan huono ratkaisu ja olen useammassa softassa
+sietänyt tällaista pientä epäpuhtautta, koska muiden ratkaisujen haitat ovat usein (muttei aina) suurempia.
+
+=== Lopullinen ratkaisu?
+
+Olen aina sanonut, ettei luokkia pitäisi paketoida niitä niiden tyypin perusteella, mutta olen edelleen yrittänyt
+paketoida kerrosten perusteella. Toisaalta olen sanonut, että DAO-luokkien ei pitäisi liittyä entityihin tai tauluihin
+vaan käyttötapauksiin.
+
+Vasta eilen pääsin johdonmukaiseen päätökseen: siirsin palveluun läheisesti liittyvän DAO-luokan palvelupakettiin.
+Nyt fiilisteltyäni tätä jonkin aikaa olen erittäin tyytyväinen tähän. Paketti on yksi koheesinen kokonaisuus. Sen
+julkiset luokat sisältävät kaiken mitä tarvitsee tietää jos käyttää pakettia. Sen toteutus sisältää kaiken mihin on
+syytä tutustua kun muokkaa toiminnallisuutta. Tästä huolimatta eri kysymykset (tietokantakäsittely,
+liiketoimintalogiikka, jne.) ovat siististi erillään omissa luokissaan.
+
+Lopuksi huomasin että sain tehtyä hyvin monesta luokasta package privateja: mulla oli useampi DTO, joita käytettiin
+vain DAO:n ja palvelun väliseen kommunikointiin. Nyt ne eivät näy sovelluksessa laajemmin, joka tekee kokonaisuudesta
+taas helpomman hahamottaa.
+
+=== Kysymyksiä
+
+Miten arvottaa erilaisia ratkaisuja? Jos eri kerrokset ovat samassa paketissa, koodista on vaikeampi hahmottaa
+kerroksia? Erilaiset tavat organisoida koodia tarjoavat erilaisia hyviä ja huonoja puolia.
+
+On hyvä kysyä itseltään mitkä asiat yleensä kiinnostavat kun navigoi koodissa. Kuinka usein haluan lukea kaikki
+järjestelmän DAO:t läpi? Olisiko yleisempää se, että haluan lukea tiettyyn käyttötapaukseen liittyvän koodin läpi?
+Onko jotain muita tapoja merkitä koodiin muita akseleita (esim. DAO-luokkien tapauksessa `Dao`-suffiksit ja
+`@Repository`-annotaatiot)?
+
+Kannattaa kysellä ja kyseenalaistaa.

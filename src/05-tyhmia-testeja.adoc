@@ -1,0 +1,58 @@
+== Tyhmiä testejä
+
+=== Haha, pellet! Eihän toi edes testaa mitään!
+
+Kirjoitin taas eilen testitapauksen, jolle kuuluu kunnon TDD-piireissä hymähdellä halventavasti:
+
+[source,java]
+----
+public void smokeTestSqlQueries() {
+    // This does not really test anything properly, but at least it
+    // executes the SQL-queries to check that they are syntactically
+    // valid and refer to existing tables and columns.
+
+    schedulingDao.findSchedulesForProject(projectId);
+    schedulingDao.findExpiredSchedules();
+}
+----
+
+No niin, nyt kuka tahansa osaa toteuttaa noi DAO-metodit: tehdään kaikista vain tyhjiä ja testit menevät läpi. Selvästi
+siis hyödytön testi.
+
+Realistisesti DAO-metodien kirjoittaja ei tietysti ole paha hakkeri joka yrittää löytää kaikki porsaanreiät testeistä
+vaan minä itse. Yritän saada metodin toimimaan ja kun olen vakuuttunut siitä että se toimii, haluan minimihinnalla
+jonkinlaisen takuun siitä että se myös jatkaa toimimistaan.
+
+=== Testit tyypityksen laajennoksena
+
+Tässä porukassa on varmaan ihan yleisesti hyväksyttyä että staattinen tyypitys voi vähentää merkittävästi testien
+tarvetta ja antaa luottamusta refaktorointiin. Monet refaktoroinnit ovat sellaisia, että olemassaoleva koodi joko
+hajoaa kokonaan tai jatkaa toimimistaan. (Etenkin jos pyrkii aktiivisesti refaktoroinnissa tähän. Esim. jos kentän
+semantiikka muuttuu täysin, on parempi poistaa vanha ja tehdä uusi kuin vain vaihtaa hiljaisesti vanhan semantiikkaa,
+jotta saa käännösvirheinä viitteet vanhaan kenttään. Tai vaihtoehtoisesti voi vaihtaa kenttien tyyppejä.)
+
+Monet samoista asioista pätevät myös SQL:ään ja HQL:ään: jos muodostettu kysely on syntaktisesti oikein ja viittaa
+kannassa olemassaoleviin asioihin, on melko epätodennäköistä että muutokset skeemaan muuttavat kyselyn semantiikkaa
+ilman että ne hajottavat itse kyselyä. Etenkin jos kannan refaktorointiin sovelletaan vastaavia käytöntöjä kuin koodin
+refaktorointiin.
+
+Ongelmaksi jää siis lähinnä se, että kyselyt ovat stringeinä koodissa eikä niitä välttämättä verifioida käännösaikana.
+(IDEA:n inspectionit saavat toki kiinni ison osan näistä, mutta nekin ajetaan oletuksena vain sille koodille mitä on
+itse muuttanut eikä koko projektin koodille.)
+
+Ratkaisuna on siis lisätä staattinen tyypitys SQL-kyselyille: tehdä testejä, jotka ajavat kyselyt tietokantaa vasten
+läpi, jotta kanta pääsee verifioimaan ne skeemaa vasten. Tämä jättää paljon testaamatta, mutta tarjoaa minimivaivalla
+osapuilleen samat takeet kuin normaali staattinen tyypitys Java-koodissa.
+
+=== Mutta entäs oikeat testit?
+
+Tämä ei toki tarkoita sitä, etteikö oikeitakin testejä kannattaisi kirjoittaa ja etteikö niistä olisi hyötyä. Mutta
+toisaalta jokaisen projektissa on varmasti runsaasti SQL-kyselyitä, joita ei ajeta testeissä lainkaan, joten tämäkin
+kannattaa tehdä. Käytettyyn aikaan nähden näiden hyöty on huomattavasti suurempi kuin millään muulla testauksen
+muodolla.
+
+Lopuksi täytyy todeta, että muihin kuin tietokantakyselyihin tästä on tuskin iloa. Koodi menee nyt jo kääntäjän läpi
+ja jos aikoisi saada vain kattavuutta ajamalla normaalikoodia näin, niin luultavasti joutuisi näkemään hirveästi vaivaa
+dependencyjen mockaukseen luodakseen testejä joiden tarjoamat takeet ovat osapuilleen samat kuin mitä kääntäjä antaa
+jo nyt. Loppujen onnistuisi luomaan mock-helvettiä joka vain haittaa refaktorointia: eli juuri sitä mitä
+random-projektien testit ovatkin. :)
