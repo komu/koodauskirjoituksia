@@ -1,14 +1,41 @@
 == Johdanto
 
-Tässä dokumentissa on joukko ohjelmointiaiheisia kirjoituksia, joita olen kirjoittanut alunperin Evidentin sisäiseen
-levitykseen. Koska näissä ei varsinaisesti ole mitään salaista ja ne voivat kiinnostaa muitakin, päätin jakaa ne
-yleisemminkin.
+[quote, Abelson &amp; Sussman, Structure and Interpretation of Computer Programs]
+____
+Thus, programs must be written for people to read, and only incidentally for machines to execute.
+____
 
-Olen alunperin kirjoittanut tekstit hyvin rajatulle kohderyhmälle tarkoituksena herättää keskustelua. Nytkään en ole
-muotoilua lukuunottamatta muokannut niitä. Osa teksteistä tekee aika huolettomia hyppyjä olettaen, että lukijat
-jakavat osapuilleen samoja näkemyksiä ohjelmoinnista. Perusteluita ja selityksiä on siis huomattavasti vähemmän kuin
-jos olisin alunperin kirjoittanut isommalle yleisölle.
+Suurin osa ohjelmointiteksteistä on suunnattu joko aloittelijoille, käsittelevät tiettyä teknologiaa tai yrittävät
+opettaa jotain konkreettisia ohjelmointitekniikoita. Nämä ovat kaikki hyödyllisiä, mutta olen kaivannut sellaisia
+kokeneille ohjelmoijille suunnattuja tekstejä, jotka keskittyisivät hienovaraisempiin asioihin: pohdiskelua tyylistä,
+ylläpidettävyydestä, ilmaisukeinoista.
 
-Yksittäiset luvut ovat itsenäisiä ja ne voi lukea missä tahansa järjestyksessä.
+Olen siis kaivannut tekstejä ohjelmoijille, jotka eivät enää joudu käyttämään suurinta osaa ajastaan siihen miten
+ongelma ratkaistaan teknisessä mielessä, vaan voivat keskittyä punniskelemaan erilaisten ilmaisutapojen hyviä ja
+huonoja puolia.
 
-Palautetta voi antaa osoitteeseen juha.komulainen@evident.fi.
+Vertauksena voisi ottaa kirjoittamisen: suurin osa aikuisista ihmisistä ei joudu käyttämään energiaa kirjoittamisen
+mekaaniseen puoleen. Vaikeaa on kirjoittaa sulavasti, ymmärrettävästi -- tyylikkäästikin. Nämä ovat tärkeitä arvoja
+myös ohjelmoinnissä.
+
+Tarkoituksenani ei siis ole opettaa lukijaa kirjoittamaan yhtään sellaista ohjelmaa, jota hän ei olisi osannut
+kirjoittaa aiemminkin. Toivon kuitenkin, että teksteistä voisi oppia tekniikoita tai vähintäänkin asennetta ohjelmien
+jäsentämiseen niin, että niitä olisi miellyttävämpää lukea ja ylläpitää.
+
+=== Varoituksen sana
+
+Pohjana kirjoituksille ovat alunperin https://www.evident.fi/[Evidentin] sisäiseen levitykseen kirjoittamani tekstit.
+Koska kohderyhmä on ollut kokenut, erittäin rajallinen ja minulle tuttu, olen ottanut välillä melkoisia hyppyjä
+perusteluiden ja selitysten suhteen. Olen tiennyt lukijoiden jakavan osapuilleen samat näkemykset ohjelmoinnista.
+Toisaalta olen halunnut jättää tilaa kahvipöytäkeskusteluille. Ei kannata siis niellä kaikkea pureksimatta.
+
+=== Dokumentti verkossa
+
+Nämä tekstit päivittyvät aikojen myötä, mutta viimeisimmät versiot löytyvät seuraavista osoitteista:
+
+- https://komun-koodauskirjoituksia.evident.fi/ (HTML)
+- https://komun-koodauskirjoituksia.evident.fi/komun-koodauskirjoituksia.pdf (PDF)
+
+=== Palaute
+
+Risuja, ruusuja ja ideoita kirjoitusaiheista voi lähettää osoitteeseen juha.komulainen@evident.fi.
