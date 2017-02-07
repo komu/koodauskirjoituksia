@@ -94,7 +94,7 @@ Ehdotankin seuraavaa metriikkaa:
 `goodSquare`-funktion tapauksessa sekä parametrien että paluuarvon redundanssi on 0; vaikuttaa
 myös epätodennäköiseltä että redundanssi kasvaisi refaktoroinnin myötä.
 
-Tällä hetkellä `squareOfSalary`:n parametrien redundanssi on tällä hetkellä yli 2/3 (objektin
+Tällä hetkellä `squareOfSalary`:n parametrien redundanssi on yli 2/3 (objektin
 propertyt laskettuna tarkasti 2/3, mutta lisäksi metodiin välitetään `Employee`-objektin
 identiteetti). Tässä tapauksessa vaikuttaa todennäköiseltä, että redundanssi tulee projektin
 myötä kasvamaan paljonkin.
